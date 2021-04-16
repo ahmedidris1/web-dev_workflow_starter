@@ -18,24 +18,25 @@ const browserSync = require("browser-sync").create();
 files = {
   css: {
     src: "./app/src/scss/main.scss",
-    dist: ".app/dist/css",
+    dist: "./app/dist/css",
     all: "./app/src/scss/**/*.scss",
   },
 
   js: {
-    src: "./app/src/js/test.js",
-    dist: ".app/dist/js",
+    src: "./app/src/js/index.js",
+    dist: "./app/dist/js",
+    all: "./app/src/js/**/*.js",
   },
 
   images: {
     src: "./app/src/assets/images",
-    dist: ".app/dist/assets/images",
-    extentions: "./app/src/assets/images/**/ *.{ jpg, jpeg, png, gif, svg }",
+    dist: "./app/dist/assets/images",
+    extentions: "./app/src/assets/images/**/*.{jpg,jpeg,png,gif,svg}",
   },
   fonts: {
     src: "./app/src/assets/fonts",
-    dist: ".app/dist/assets/fonts",
-    extentions: "./app/src/assets/images/**/ *.{ svg, eot, ttf, woff, woff2 }",
+    dist: "./app/dist/assets/fonts",
+    extentions: "./app/src/assets/fonts/**/*.{svg,eot,ttf,woff,woff2}",
   },
 };
 
@@ -43,15 +44,15 @@ files = {
 
 // --------- Clean Tasks -------------
 const clean = () => {
-  return del([".app/dist"]);
+  return del(["./app/dist"]);
 };
 
 const cleanImages = () => {
-  return del([".app/dist/assets/images"]);
+  return del([files.images.dist]);
 };
 
 const cleanFonts = () => {
-  return del([".app/dist/assets/fonts"]);
+  return del([files.fonts.dist]);
 };
 
 // --------- SASS to CSS Task ------------
@@ -68,6 +69,26 @@ const css = () => {
 };
 
 // Bundle JS files Task
+const js = () => {
+  return src(files.js.src)
+    .pipe(
+      babel({
+        presets: ["@babel/env"],
+      })
+    )
+    .pipe(
+      webpack({
+        mode: "development",
+        devtool: "#@inline-source-map",
+      })
+    )
+    .pipe(mode.development(sourcemaps.init({ loadMaps: true })))
+    .pipe(rename("app.js"))
+    .pipe(mode.production(terser({ output: { comments: false } })))
+    .pipe(mode.development(sourcemaps.write()))
+    .pipe(dest(files.js.dist))
+    .pipe(mode.development(browserSync.stream()));
+};
 
 // Copy Tasks
 const copyImages = () => {
@@ -88,6 +109,8 @@ const watchForChanges = () => {
 
   watch(files.css.all, css);
 
+  watch(files.js.all, js);
+
   watch("**/*.html").on("change", browserSync.reload);
 
   watch(files.images.extentions, series(cleanImages, copyImages));
@@ -98,8 +121,8 @@ const watchForChanges = () => {
 // Public (Default) Task
 exports.default = series(
   clean,
-  parallel(css, copyImages, copyFonts),
+  parallel(css, js, copyImages, copyFonts),
   watchForChanges
 );
 
-exports.build = series(clean, parallel(css, copyImages, copyFonts));
+exports.build = series(clean, parallel(css, js, copyImages, copyFonts));
